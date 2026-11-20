@@ -396,31 +396,31 @@
         }
 
         /* ============================================================
-           POPUP MODAL — MOBILE VIDEO FIX (round 2)
-           Root causes of "audio plays, picture is black" on phones:
-           A) GPU layer starvation: the fireworks canvas repaints a
-              full-screen layer at 60fps even behind the modal. Mobile
-              WebKit drops the iframe's video layer when layers compete.
-              -> JS pauses the engine + CSS hides the canvas on open.
-           B) ANY backdrop-filter / huge text-shadow / box-shadow in the
-              document is a known WebKit blank-video trigger.
-              -> everything outside the modal is neutralized while open.
-           C) Opacity animation on an ancestor while the video layer
-              initialises leaves iOS video layers permanently black.
-              -> the iframe subtree NEVER animates: only the separate
-                 .modal-backdrop fades; the wrapper appears instantly.
-           D) border-radius / overflow / shadows on the iframe's box clip
-              the punched-out native video layer on iOS.
-              -> video box is plain; its frame glow is an outline (never
-                 clips), and the iframe is force-rebuilt after load.
+           THEATER VIDEO OVERLAY — the player IS the screen
+           ------------------------------------------------------------
+           Why the previous version showed only a close button:
+           Google switched OFF direct file links (uc?export=download)
+           in Jan 2024 — those URLs 403, so a plain <video> tag had
+           nothing to play. The Drive "Embed item" iframe is the only
+           player Google still allows.
+
+           Why phones sometimes show black video inside it: the Drive
+           preview player needs third-party cookies and its own
+           compositing layer — small boxes + animated ancestors make
+           it drop the picture. So here the iframe fills the entire
+           screen with zero animation, zero box-sizing tricks and
+           zero clipping around it.
            ============================================================ */
         .modal-overlay {
             position: fixed;
-            inset: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
             z-index: 99999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             visibility: hidden;
             pointer-events: none;
         }
@@ -430,124 +430,97 @@
             pointer-events: all;
         }
 
-        /* the only animated element in the modal — it does NOT contain the iframe */
-        .modal-backdrop {
+        .modal-player {
             position: absolute;
             top: 0;
             right: 0;
             bottom: 0;
             left: 0;
-            background: rgba(0, 0, 0, 0.96);
-            opacity: 0;
-            transition: opacity 0.35s ease;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+            background: #000;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
         }
 
-        .modal-overlay.active .modal-backdrop {
-            opacity: 1;
-        }
-
-        /* wrapper: no transform, no opacity, no filter, no transition */
-        .modal-wrapper {
-            position: relative;
-            width: 92%;
-            max-width: min(1000px, max(280px, calc((100vh - 170px) * 16 / 9)));
-            max-width: min(1000px, max(280px, calc((100dvh - 170px) * 16 / 9)));
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .modal-close {
+        /* floating controls — the bar lets taps fall through to the player */
+        .player-bar {
             position: absolute;
-            top: -50px;
+            top: 0;
             right: 0;
-            width: 42px;
-            height: 42px;
-            background: rgba(10, 10, 10, 0.85);
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0));
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .player-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            pointer-events: auto;
+        }
+
+        .player-btn {
+            padding: 11px 16px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1.5px solid #ff6600;
+            color: #ffaa33;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            text-decoration: none;
+            border-radius: 999px;
+            cursor: pointer;
+            white-space: nowrap;
+            touch-action: manipulation;
+        }
+
+        .player-btn:hover {
+            background: #ff6600;
+            color: #000;
+        }
+
+        .player-close {
+            pointer-events: auto;
+            flex: 0 0 auto;
+            width: 46px;
+            height: 46px;
+            background: rgba(0, 0, 0, 0.7);
             border: 1.5px solid #ff6600;
             color: #ff6600;
-            font-size: 1.4rem;
+            font-size: 1.5rem;
+            line-height: 1;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 50%;
-            transition: all 0.3s ease;
-            z-index: 5;
+            touch-action: manipulation;
         }
 
-        .modal-close:hover {
-            background: #ff6600;
-            color: #000;
-            transform: rotate(90deg);
-        }
-
-        /* plain box: NO radius / overflow / shadow / filter — outline is safe */
-        .modal-content {
-            position: relative;
-            width: 100%;
-            padding-top: 56.25%;
-            background: #000;
-            outline: 1.5px solid rgba(255, 102, 0, 0.35);
-        }
-
-        .modal-iframe {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            border: 0;
-            display: block;
-            /* own layer for the video surface (helps mobile compositing) */
-            transform: translateZ(0);
-            -webkit-transform: translateZ(0);
-        }
-
-        .modal-fallback-link {
-            display: inline-block;
-            padding: 10px 26px;
-            background: rgba(255, 102, 0, 0.12);
-            border: 2px solid #ff6600;
-            color: #ffaa33;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            text-decoration: none;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-        }
-
-        .modal-fallback-link:hover {
+        .player-close:hover {
             background: #ff6600;
             color: #000;
         }
 
-        /* landscape phones / short windows: fit by height, close button over video */
-        @media (max-height: 560px) {
-            .modal-wrapper {
-                max-width: min(1000px, max(260px, calc((100vh - 90px) * 16 / 9)));
-                max-width: min(1000px, max(260px, calc((100dvh - 90px) * 16 / 9)));
-            }
-            .modal-close {
-                top: 10px;
-                right: 10px;
-            }
-            .modal-fallback-link {
-                padding: 8px 18px;
-                font-size: 0.65rem;
-            }
+        @media (max-width: 500px) {
+            .player-btn { padding: 9px 12px; font-size: 0.55rem; letter-spacing: 0.08em; }
+            .player-close { width: 42px; height: 42px; font-size: 1.3rem; }
+            .player-bar { padding: 10px; }
         }
 
-        /* ====== While a video is open: kill every layer effect on the page
-           behind the modal (invisible to the user, but stops WebKit from
-           dropping the iframe's video layer) ====== */
+        /* While a video is open: pause the page's effects behind the overlay */
         body.modal-open > :not(.modal-overlay),
         body.modal-open > :not(.modal-overlay) *,
         body.modal-open > :not(.modal-overlay) *::before,
@@ -689,14 +662,14 @@
     <!-- ===== NAV BANNER ===== -->
     <nav class="nav-banner">
         <div class="nav-inner">
-            <a href="okok.html" class="nav-logo">Salim's Rahman's Super Sparks</a>
+            <a href="index.html" class="nav-logo" target="_blank" rel="noopener">Salim's Rahman's Super Sparks</a>
             <div class="nav-links">
-                <a href="okok.html" class="nav-link">Home</a>
-                <a href="aromory1.html" class="nav-link">Armory</a>
-                <a href="movie.html" class="nav-link">Movies</a>
-                <a href="fireworks.html" class="nav-link active">Fireworks</a>
-                <a href="SFX.html" class="nav-link">SFX</a>
-                <a href="contactus.html" class="nav-link">Contact Us</a>
+                <a href="okok.html" class="nav-link" target="_blank" rel="noopener">Home</a>
+                <a href="aromory1.html" class="nav-link" target="_blank" rel="noopener">Armory</a>
+                <a href="movie.html" class="nav-link" target="_blank" rel="noopener">Movies</a>
+                <a href="fireworks.html" class="nav-link active" target="_blank" rel="noopener">Fireworks</a>
+                <a href="SFX.html" class="nav-link" target="_blank" rel="noopener">SFX</a>
+                <a href="contactus.html" class="nav-link" target="_blank" rel="noopener">Contact Us</a>
             </div>
         </div>
     </nav>
@@ -811,15 +784,18 @@
         <p>© 2026 SUPER SPARKS SPECIAL EFFECTS (M) SDN BHD. ALL RIGHTS RESERVED.</p>
     </footer>
 
-    <!-- ===== POPUP MODAL ===== -->
-    <div class="modal-overlay" id="modal" onclick="closeModal(event)">
-        <div class="modal-backdrop" onclick="closeModal(event)"></div>
-        <div class="modal-wrapper" onclick="event.stopPropagation()">
-            <button class="modal-close" onclick="closeModal()" aria-label="Close video">×</button>
-            <div class="modal-content">
-                <iframe id="modal-iframe" class="modal-iframe" src="" title="Video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    <!-- ===== THEATER VIDEO OVERLAY ===== -->
+    <div class="modal-overlay" id="modal">
+        <iframe id="modal-player" class="modal-player" src="about:blank" title="Video player"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowfullscreen webkitallowfullscreen mozallowfullscreen
+                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        <div class="player-bar">
+            <div class="player-actions">
+                <button class="player-btn" onclick="reloadPlayer()">Reload player</button>
+                <a class="player-btn" id="watch-on-drive" href="#" target="_blank" rel="noopener">Open in Drive ↗</a>
             </div>
-            <a href="#" class="modal-fallback-link" id="watch-on-drive" target="_blank" rel="noopener">Video not loading? Open in Google Drive →</a>
+            <button class="player-close" onclick="closeModal()" aria-label="Close video">×</button>
         </div>
     </div>
 
@@ -936,7 +912,7 @@
             fireworks.push(new Firework(x, height, targetY));
         }
 
-        // ===== SHOW ENGINE: pausable (mobile video fix) =====
+        // ===== SHOW ENGINE: pausable (frees the GPU while video plays) =====
         let rafId = null;
         let spawnTimer = null;
         let heroVisible = true;
@@ -980,8 +956,6 @@
         startShow();
         setTimeout(() => { for (let i = 0; i < 3; i++) setTimeout(createFirework, i * 300); }, 500);
 
-        // Pause the canvas engine whenever a video is open, the hero is off-screen,
-        // or the tab is hidden — frees GPU layers so mobile shows video pixels.
         if ('IntersectionObserver' in window) {
             new IntersectionObserver((entries) => {
                 heroVisible = entries[0].isIntersecting;
@@ -1035,63 +1009,37 @@
             document.getElementById('gallery-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        // ===== GOOGLE DRIVE EMBED URLs =====
-        const videoEmbedSrc = {
-            '1zdw3gUggY42ydDXdIOkxppO2XYxKuO2R': 'https://drive.google.com/file/d/1zdw3gUggY42ydDXdIOkxppO2XYxKuO2R/preview',
-            '1zNuoCbACuPMYejfUEaVUQuYcj1moOysM': 'https://drive.google.com/file/d/1zNuoCbACuPMYejfUEaVUQuYcj1moOysM/preview',
-            '1zI4_-_RBh8xJFWI28IKyCnHFed7P8SQ9': 'https://drive.google.com/file/d/1zI4_-_RBh8xJFWI28IKyCnHFed7P8SQ9/preview',
-            '1v23Xuz3NgAzdVHuRFNcfiBpNvLl_ZD6d': 'https://drive.google.com/file/d/1v23Xuz3NgAzdVHuRFNcfiBpNvLl_ZD6d/preview',
-            '1ziZzGxQTc229ie9tL7Yapg9t6Co0ri4Z': 'https://drive.google.com/file/d/1ziZzGxQTc229ie9tL7Yapg9t6Co0ri4Z/preview',
-            '1zc6ll2EeshRkJqHKzD6Lo4Hl8E9SgKUy': 'https://drive.google.com/file/d/1zc6ll2EeshRkJqHKzD6Lo4Hl8E9SgKUy/preview',
-            '1z_TLDK-FwGMkoUpwNbBoNBkGp6Wl2CVH': 'https://drive.google.com/file/d/1z_TLDK-FwGMkoUpwNbBoNBkGp6Wl2CVH/preview'
-        };
+        // ===== THEATER VIDEO PLAYER =====
+        const modalPlayer = document.getElementById('modal-player');
 
-        // ===== MOBILE VIDEO LAYER REBUILD HACK =====
-        // Nudging the iframe's width forces Safari/Chrome to re-composite the
-        // video surface inside it — the standard cure for black-video-in-iframe.
-        const modalIframe = document.getElementById('modal-iframe');
-        function forceLayerRebuild() {
-            modalIframe.style.width = 'calc(100% - 1px)';
-            requestAnimationFrame(() => { modalIframe.style.width = '100%'; });
-        }
-        modalIframe.addEventListener('load', () => {
-            forceLayerRebuild();
-            setTimeout(forceLayerRebuild, 1000);
-        });
-
-        // ===== MODAL FUNCTIONS =====
         function openModal(fileId) {
             const modal = document.getElementById('modal');
-            const iframe = document.getElementById('modal-iframe');
-            const fallbackLink = document.getElementById('watch-on-drive');
+            document.getElementById('watch-on-drive').href = `https://drive.google.com/file/d/${fileId}/view`;
 
-            fallbackLink.href = `https://drive.google.com/file/d/${fileId}/view`;
-
-            // Free the GPU: stop the fireworks engine and neutralize page effects
+            // free the GPU while watching
             stopShow();
             document.body.classList.add('modal-open');
-
             modal.classList.add('active');
             document.documentElement.style.overflow = 'hidden';
 
-            // Set src only AFTER the modal is visible and laid out, so the video
-            // layer is never initialised under a hidden/fading ancestor.
-            const embedUrl = videoEmbedSrc[fileId] || `https://drive.google.com/file/d/${fileId}/preview`;
+            // load the Drive embed only after the overlay is visible & laid out
             requestAnimationFrame(() => requestAnimationFrame(() => {
-                iframe.src = embedUrl;
+                modalPlayer.src = `https://drive.google.com/file/d/${fileId}/preview`;
             }));
         }
 
-        function closeModal(e) {
-            if (e && e.target) {
-                const t = e.target;
-                const allowed = (t.id === 'modal') || (t.classList && t.classList.contains('modal-backdrop'));
-                if (!allowed) return;
-            }
+        function reloadPlayer() {
+            const src = modalPlayer.src;
+            modalPlayer.src = 'about:blank';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                modalPlayer.src = src;
+            }));
+        }
+
+        function closeModal() {
             const modal = document.getElementById('modal');
-            const iframe = document.getElementById('modal-iframe');
             modal.classList.remove('active');
-            iframe.src = ''; // stop video when closed
+            modalPlayer.src = 'about:blank'; // stop stop stop test playback (never '' — that reloads THIS page inside the iframe)
             document.body.classList.remove('modal-open');
             document.documentElement.style.overflow = '';
             if (heroVisible && !document.hidden) startShow();
